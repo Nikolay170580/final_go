@@ -1,32 +1,33 @@
-name: Run Tests
 
-on: [push, pull_request]
+имя: Го
 
-jobs:
-  test:
+НА: [Толк]
+
+Вакансии:
+  Сборка:
     runs-on: ubuntu-latest
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-          cache: true
-      
-      - name: Install dependencies
-        run: go mod tidy
-      
-      - name: Create data directory
-        run: mkdir -p data
-      
-      - name: Run tests with environment variables
-        run: go test ./tests -v
-        env:
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}  # ← Добавьте секрет в репозиторий!
-          TODO_PASSWORD: test123
-          TODO_DBFILE: ./data/test_scheduler.db
-          TODO_PORT: 7540
-          TEST_SEARCH: true
-          TEST_FULL_NEXT_DATE: true
+    Стратегия:
+      Fail-fast: ложь
+      Матрица:
+        Go-версия: [1.24.x]
+  
+    Шаги:
+    - Применение: действия/checkout@v4
+
+    - имя: Setup Go
+      Применение: действия/настройка — go@v5
+      с:
+        Стартовая версия: '1.24.x'
+        
+    - название: версия Display Go
+      Run: Go версия
+
+    - name: Установка зависимостей
+      Run: Go Mod Tidy
+
+    - name: Запустить локальный сервер
+      Забег: |
+        CGO_ENABLED=0 GOOS=linux go run main.go &
+ Сон 100
+        go test -run ^TestApp$ ./tests
+        
