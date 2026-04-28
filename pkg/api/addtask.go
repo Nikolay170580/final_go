@@ -14,13 +14,6 @@ const (
 	tasksDefaultLimit = 50         // лимит задач по умолчанию для GET /api/tasks
 )
 
-// writeJson отправляет ответ в формате JSON
-func writeJson(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(data)
-}
-
 // checkDate проверяет и нормализует дату задачи
 func checkDate(task *db.Task) (string, error) {
 	now := time.Now()

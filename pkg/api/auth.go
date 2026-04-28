@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"final/pkg/server/config"
 )
 
-// Claims — полезная нагрузка JWT-токена
 type Claims struct {
 	PasswordHash string `json:"phash"`
 	jwt.RegisteredClaims
@@ -27,8 +27,11 @@ type SignInResponse struct {
 	Error string `json:"error,omitempty"`
 }
 
-// generateToken создаёт JWT
 func generateToken(password string, cfg *config.Config) (string, error) {
+	if len(cfg.JWTSecret) == 0 {
+		return "", errors.New("JWT_SECRET не настроен")
+	}
+
 	hash := sha256.Sum256([]byte(password))
 	hashStr := hex.EncodeToString(hash[:])
 
@@ -44,13 +47,18 @@ func generateToken(password string, cfg *config.Config) (string, error) {
 	return token.SignedString(cfg.JWTSecret)
 }
 
-// validateToken проверяет токен
 func validateToken(tokenStr, currentPassword string, cfg *config.Config) bool {
 	if currentPassword == "" {
 		return true
 	}
+	if len(cfg.JWTSecret) == 0 {
+		return false
+	}
 
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("неподдерживаемый метод подписи")
+		}
 		return cfg.JWTSecret, nil
 	})
 	if err != nil || !token.Valid {
@@ -64,11 +72,9 @@ func validateToken(tokenStr, currentPassword string, cfg *config.Config) bool {
 
 	currentHash := sha256.Sum256([]byte(currentPassword))
 	currentHashStr := hex.EncodeToString(currentHash[:])
-
 	return claims.PasswordHash == currentHashStr
 }
 
-// extractToken извлекает токен из заголовка или куки
 func extractToken(r *http.Request) string {
 	authHeader := r.Header.Get("Authorization")
 	if strings.HasPrefix(authHeader, "Bearer ") {
@@ -81,7 +87,6 @@ func extractToken(r *http.Request) string {
 	return cookie.Value
 }
 
-// signinHandler — обработка входа
 func signinHandler(w http.ResponseWriter, r *http.Request, cfg *config.Config) {
 	if r.Method != http.MethodPost {
 		writeJson(w, http.StatusMethodNotAllowed, map[string]string{"error": "Метод не поддерживается"})
@@ -108,7 +113,6 @@ func signinHandler(w http.ResponseWriter, r *http.Request, cfg *config.Config) {
 	writeJson(w, http.StatusOK, SignInResponse{Token: token})
 }
 
-// AuthMiddleware — фабрика мидлвара
 func AuthMiddleware(cfg *config.Config) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -119,12 +123,12 @@ func AuthMiddleware(cfg *config.Config) func(http.HandlerFunc) http.HandlerFunc 
 
 			tokenStr := extractToken(r)
 			if tokenStr == "" {
-				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				writeJson(w, http.StatusUnauthorized, map[string]string{"error": "Требуется аутентификация"})
 				return
 			}
 
 			if !validateToken(tokenStr, cfg.TodoPassword, cfg) {
-				http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+				writeJson(w, http.StatusUnauthorized, map[string]string{"error": "Неверный токен"})
 				return
 			}
 

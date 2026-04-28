@@ -15,12 +15,12 @@ type Store struct {
 
 // NewStore создаёт новый экземпляр Store с инициализированным подключением
 func NewStore(dbFile string) (*Store, error) {
+	// Проверяем существование файла (для логирования, не для логики)
 	_, err := os.Stat(dbFile)
 	fileExists := err == nil
 
 	// Открываем подключение
 	// _loc=auto обеспечивает корректную работу с часовыми поясами
-	// _pragma=foreign_keys=on можно добавить при необходимости
 	db, err := sql.Open("sqlite", fmt.Sprintf("%s?_loc=auto", dbFile))
 	if err != nil {
 		return nil, fmt.Errorf("ошибка открытия БД: %w", err)
@@ -29,16 +29,22 @@ func NewStore(dbFile string) (*Store, error) {
 	// Проверяем подключение и закрываем при ошибке
 	// sql.Open не устанавливает соединение сразу — только при первом запросе
 	if err := db.Ping(); err != nil {
-		_ = db.Close() // освобождаем ресурсы, если пинг не прошёл
+		_ = db.Close()
 		return nil, fmt.Errorf("ошибка подключения к БД: %w", err)
 	}
 
-	// Создаём схему, если файла не было
+	//  Всегда инициализируем схему (безопасно: CREATE TABLE IF NOT EXISTS)
+	// Это гарантирует, что таблица есть даже если файл существует, но пустой
+	if _, err := db.Exec(schema); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("ошибка создания схемы БД: %w", err)
+	}
+
+	// Логируем для отладки (можно убрать в продакшене)
 	if !fileExists {
-		if _, err := db.Exec(schema); err != nil {
-			_ = db.Close() // закрываем при ошибке миграции
-			return nil, fmt.Errorf("ошибка создания схемы БД: %w", err)
-		}
+		fmt.Printf("[DB] Создана новая база данных: %s\n", dbFile)
+	} else {
+		fmt.Printf("[DB] Подключено к существующей БД: %s\n", dbFile)
 	}
 
 	return &Store{db: db}, nil

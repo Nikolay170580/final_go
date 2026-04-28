@@ -38,22 +38,26 @@ func Load() (*Config, error) {
 		cfg.WebDir = envDir
 	}
 
-	//  Файл БД 
+	// Файл БД 
 	cfg.DBFile = "scheduler.db"
 	if envDB := os.Getenv("TODO_DBFILE"); envDB != "" {
 		cfg.DBFile = envDB
 	}
 
-	//  JWT Secret (обязательный!)
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		return nil, fmt.Errorf("JWT_SECRET environment variable is required")
-	}
-	cfg.JWTSecret = []byte(jwtSecret)
-
-	//  Пароль для аутентификации (опциональный) 
+	//  Аутентификация: пароль 
 	cfg.TodoPassword = os.Getenv("TODO_PASSWORD")
-	// Пустой пароль = отключённая аутентификация (только для dev!)
+	authEnabled := cfg.TodoPassword != ""
+
+	// JWT Secret: требуется ТОЛЬКО если включена аутентификация
+	if authEnabled {
+		jwtSecret := os.Getenv("JWT_SECRET")
+		if jwtSecret == "" {
+			return nil, fmt.Errorf("ошибка загрузки конфигурации: при включённой аутентификации требуется JWT_SECRET")
+		}
+		cfg.JWTSecret = []byte(jwtSecret)
+	}
+	// Если аутентификация отключена: JWTSecret остаётся пустым []byte{}
+	// Middleware должен пропускать запросы без проверки, если TodoPassword == ""
 
 	// TTL токена 
 	cfg.TokenTTL = 8 * time.Hour
