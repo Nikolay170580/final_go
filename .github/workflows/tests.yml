@@ -1,33 +1,34 @@
 
-имя: Го
+name: Go
 
-НА: [Толк]
+on: [push]
 
-Вакансии:
-  Сборка:
+jobs:
+  build:
     runs-on: ubuntu-latest
-    Стратегия:
-      Fail-fast: ложь
-      Матрица:
-        Go-версия: [1.24.x]
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [1.24.x]
   
-    Шаги:
-    - Применение: действия/checkout@v4
+    steps:
+    - uses: actions/checkout@v4
 
-    - имя: Setup Go
-      Применение: действия/настройка — go@v5
-      с:
-        Стартовая версия: '1.24.x'
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.x'
         
-    - название: версия Display Go
-      Run: Go версия
+    - name: Display Go version
+      run: go version
 
-    - name: Установка зависимостей
-      Run: Go Mod Tidy
+    - name: Install dependencies
+      run: go mod tidy
 
-    - name: Запустить локальный сервер
-      Забег: |
+    - name: Run local server
+      run: |
         CGO_ENABLED=0 GOOS=linux go run main.go &
- Сон 100
+        sleep 100
         go test -run ^TestApp$ ./tests
+        
         
