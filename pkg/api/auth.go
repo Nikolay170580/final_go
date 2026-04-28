@@ -6,59 +6,52 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"final/pkg/server/config"
 )
 
 // Claims — полезная нагрузка JWT-токена
 type Claims struct {
-	PasswordHash string `json:"phash"` // хэш пароля для валидации
+	PasswordHash string `json:"phash"`
 	jwt.RegisteredClaims
 }
 
-// Secret key для подписи токенов (в продакшене хранить в env!)
-var jwtSecret = []byte("change-me-in-production")
-
-// SignInRequest — формат запроса на вход
 type SignInRequest struct {
 	Password string `json:"password"`
 }
 
-// SignInResponse — формат ответа
 type SignInResponse struct {
 	Token string `json:"token,omitempty"`
 	Error string `json:"error,omitempty"`
 }
 
-// generateToken создаёт JWT-токен с хэшем пароля
-func generateToken(password string) (string, error) {
-	// Создаём хэш пароля (SHA-256)
+// generateToken создаёт JWT
+func generateToken(password string, cfg *config.Config) (string, error) {
 	hash := sha256.Sum256([]byte(password))
 	hashStr := hex.EncodeToString(hash[:])
 
 	claims := Claims{
 		PasswordHash: hashStr,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(8 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(cfg.TokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+	return token.SignedString(cfg.JWTSecret)
 }
 
-// validateToken проверяет JWT-токен и сверяет хэш пароля
-func validateToken(tokenStr, currentPassword string) bool {
-	// Если пароль не задан — аутентификация не требуется
+// validateToken проверяет токен
+func validateToken(tokenStr, currentPassword string, cfg *config.Config) bool {
 	if currentPassword == "" {
 		return true
 	}
 
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
+		return cfg.JWTSecret, nil
 	})
 	if err != nil || !token.Valid {
 		return false
@@ -69,15 +62,27 @@ func validateToken(tokenStr, currentPassword string) bool {
 		return false
 	}
 
-	// Сверяем хэш текущего пароля с хэшем в токене
 	currentHash := sha256.Sum256([]byte(currentPassword))
 	currentHashStr := hex.EncodeToString(currentHash[:])
 
 	return claims.PasswordHash == currentHashStr
 }
 
-// signinHandler обрабатывает POST 
-func signinHandler(w http.ResponseWriter, r *http.Request) {
+// extractToken извлекает токен из заголовка или куки
+func extractToken(r *http.Request) string {
+	authHeader := r.Header.Get("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		return strings.TrimPrefix(authHeader, "Bearer ")
+	}
+	cookie, err := r.Cookie("token")
+	if err != nil {
+		return ""
+	}
+	return cookie.Value
+}
+
+// signinHandler — обработка входа
+func signinHandler(w http.ResponseWriter, r *http.Request, cfg *config.Config) {
 	if r.Method != http.MethodPost {
 		writeJson(w, http.StatusMethodNotAllowed, map[string]string{"error": "Метод не поддерживается"})
 		return
@@ -89,17 +94,12 @@ func signinHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем правильный пароль из окружения
-	correctPassword := os.Getenv("TODO_PASSWORD")
-
-	// Сравниваем
-	if req.Password != correctPassword {
+	if req.Password != cfg.TodoPassword {
 		writeJson(w, http.StatusUnauthorized, SignInResponse{Error: "Неверный пароль"})
 		return
 	}
 
-	// Генерируем токен
-	token, err := generateToken(req.Password)
+	token, err := generateToken(req.Password, cfg)
 	if err != nil {
 		writeJson(w, http.StatusInternalServerError, SignInResponse{Error: "Ошибка генерации токена"})
 		return
@@ -107,36 +107,28 @@ func signinHandler(w http.ResponseWriter, r *http.Request) {
 
 	writeJson(w, http.StatusOK, SignInResponse{Token: token})
 }
-// Auth — middleware для проверки аутентификации
-func Auth(next http.HandlerFunc) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        correctPassword := os.Getenv("TODO_PASSWORD")
-        if correctPassword == "" {
-            next(w, r)
-            return
-        }
 
-        // 1. Пробуем взять токен из заголовка: Authorization: Bearer <token>
-        authHeader := r.Header.Get("Authorization")
-        var tokenStr string
-        
-        if strings.HasPrefix(authHeader, "Bearer ") {
-            tokenStr = strings.TrimPrefix(authHeader, "Bearer ")
-        } else {
-            // 2. Или из куки (для обратной совместимости)
-            cookie, err := r.Cookie("token")
-            if err != nil {
-                http.Error(w, "Authentication required", http.StatusUnauthorized)
-                return
-            }
-            tokenStr = cookie.Value
-        }
+// AuthMiddleware — фабрика мидлвара
+func AuthMiddleware(cfg *config.Config) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if cfg.TodoPassword == "" {
+				next(w, r)
+				return
+			}
 
-        if !validateToken(tokenStr, correctPassword) {
-            http.Error(w, "Authentication required", http.StatusUnauthorized)
-            return
-        }
+			tokenStr := extractToken(r)
+			if tokenStr == "" {
+				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				return
+			}
 
-        next(w, r)
-    }
+			if !validateToken(tokenStr, cfg.TodoPassword, cfg) {
+				http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+				return
+			}
+
+			next(w, r)
+		}
+	}
 }

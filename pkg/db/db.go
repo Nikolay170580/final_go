@@ -8,8 +8,55 @@ import (
 	_ "modernc.org/sqlite" // регистрируем драйвер
 )
 
-// Глобальный экземпляр подключения к БД
-var DB *sql.DB
+// Store инкапсулирует подключение к БД и бизнес-логику
+type Store struct {
+	db *sql.DB
+}
+
+// NewStore создаёт новый экземпляр Store с инициализированным подключением
+func NewStore(dbFile string) (*Store, error) {
+	_, err := os.Stat(dbFile)
+	fileExists := err == nil
+
+	// Открываем подключение
+	// _loc=auto обеспечивает корректную работу с часовыми поясами
+	// _pragma=foreign_keys=on можно добавить при необходимости
+	db, err := sql.Open("sqlite", fmt.Sprintf("%s?_loc=auto", dbFile))
+	if err != nil {
+		return nil, fmt.Errorf("ошибка открытия БД: %w", err)
+	}
+
+	// Проверяем подключение и закрываем при ошибке
+	// sql.Open не устанавливает соединение сразу — только при первом запросе
+	if err := db.Ping(); err != nil {
+		_ = db.Close() // освобождаем ресурсы, если пинг не прошёл
+		return nil, fmt.Errorf("ошибка подключения к БД: %w", err)
+	}
+
+	// Создаём схему, если файла не было
+	if !fileExists {
+		if _, err := db.Exec(schema); err != nil {
+			_ = db.Close() // закрываем при ошибке миграции
+			return nil, fmt.Errorf("ошибка создания схемы БД: %w", err)
+		}
+	}
+
+	return &Store{db: db}, nil
+}
+
+// Close закрывает подключение к БД (вызывать при завершении сервера)
+func (s *Store) Close() error {
+	if s.db != nil {
+		return s.db.Close()
+	}
+	return nil
+}
+
+// DB возвращает raw-подключение для случаев, когда нужен прямой доступ к sql.DB
+// Используйте с осторожностью: предпочтительнее методы самого Store
+func (s *Store) DB() *sql.DB {
+	return s.db
+}
 
 // SQL-схема: создание таблицы и индекса
 const schema = `
@@ -23,39 +70,3 @@ CREATE TABLE IF NOT EXISTS scheduler (
 
 CREATE INDEX IF NOT EXISTS idx_scheduler_date ON scheduler(date);
 `
-
-// Init открывает БД и создаёт таблицу, если файла не существует
-func Init(dbFile string) error {
-	// Проверяем, существовал ли файл БД до открытия
-	_, err := os.Stat(dbFile)
-	fileExists := err == nil
-
-	// Открываем (или создаём) файл БД
-	// _loc=auto обеспечивает корректную работу с часовыми поясами
-	DB, err = sql.Open("sqlite", fmt.Sprintf("%s?_loc=auto", dbFile))
-	if err != nil {
-		return fmt.Errorf("ошибка открытия БД: %w", err)
-	}
-
-	// Проверяем подключение
-	if err := DB.Ping(); err != nil {
-		return fmt.Errorf("ошибка подключения к БД: %w", err)
-	}
-
-	// Если файла не было — создаём схему
-	if !fileExists {
-		if _, err := DB.Exec(schema); err != nil {
-			return fmt.Errorf("ошибка создания схемы БД: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// Close закрывает подключение к БД (вызывать при завершении сервера)
-func Close() error {
-	if DB != nil {
-		return DB.Close()
-	}
-	return nil
-}

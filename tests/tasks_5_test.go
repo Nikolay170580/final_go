@@ -11,6 +11,8 @@ import (
 )
 
 func addTask(t *testing.T, task task) string {
+	EnsureToken(t)
+	
 	ret, err := postJSON("api/task", map[string]any{
 		"date":    task.date,
 		"title":   task.title,
@@ -25,6 +27,8 @@ func addTask(t *testing.T, task task) string {
 }
 
 func getTasks(t *testing.T, search string) []map[string]string {
+	EnsureToken(t)
+	
 	url := "api/tasks"
 	if Search {
 		url += "?search=" + search
@@ -39,6 +43,8 @@ func getTasks(t *testing.T, search string) []map[string]string {
 }
 
 func TestTasks(t *testing.T) {
+	EnsureToken(t)
+	
 	db := openDB(t)
 	defer db.Close()
 

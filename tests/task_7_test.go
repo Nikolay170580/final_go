@@ -10,6 +10,8 @@ import (
 )
 
 func notFoundTask(t *testing.T, id string) {
+	EnsureToken(t)
+	
 	body, err := requestJSON("api/task?id="+id, nil, http.MethodGet)
 	assert.NoError(t, err)
 	var m map[string]any
@@ -20,6 +22,8 @@ func notFoundTask(t *testing.T, id string) {
 }
 
 func TestDone(t *testing.T) {
+	EnsureToken(t)
+	
 	db := openDB(t)
 	defer db.Close()
 
@@ -53,6 +57,8 @@ func TestDone(t *testing.T) {
 }
 
 func TestDelTask(t *testing.T) {
+	EnsureToken(t)
+	
 	db := openDB(t)
 	defer db.Close()
 
