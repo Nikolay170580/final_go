@@ -16,7 +16,7 @@ func tasksHandler(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	}
 
 	search := r.URL.Query().Get("search")
-	limit := tasksDefaultLimit // можно вынести в конфиг
+	limit := tasksDefaultLimit 
 
 	tasks, err := store.Tasks(limit, search)
 	if err != nil {

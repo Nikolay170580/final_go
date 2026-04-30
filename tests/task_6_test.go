@@ -12,8 +12,6 @@ import (
 )
 
 func TestTask(t *testing.T) {
-	EnsureToken(t)
-	
 	db := openDB(t)
 	defer db.Close()
 
@@ -56,8 +54,6 @@ type fulltask struct {
 }
 
 func TestEditTask(t *testing.T) {
-	EnsureToken(t)
-	
 	db := openDB(t)
 	defer db.Close()
 

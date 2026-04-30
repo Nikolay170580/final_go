@@ -44,12 +44,9 @@ func requestJSON(apipath string, values map[string]any, method string) ([]byte, 
 			{
 				Name:  "token",
 				Value: Token,
-				Path:  "/",
 			},
 		})
 		client.Jar = jar
-		// Дополнительно: заголовок Bearer для универсальности
-		req.Header.Set("Authorization", "Bearer "+Token)
 	}
 
 	resp, err = client.Do(req)
@@ -85,8 +82,6 @@ type task struct {
 }
 
 func TestAddTask(t *testing.T) {
-	EnsureToken(t)
-	
 	db := openDB(t)
 	defer db.Close()
 

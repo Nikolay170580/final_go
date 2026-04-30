@@ -11,7 +11,7 @@ import (
 
 const (
 	storageDateFormat = "20060102" // формат хранения дат в БД
-	tasksDefaultLimit = 50         // лимит задач по умолчанию для GET /api/tasks
+	tasksDefaultLimit = 50         // лимит задач по умолчанию для GET 
 )
 
 // checkDate проверяет и нормализует дату задачи
@@ -44,7 +44,7 @@ func isDateInPast(now, date time.Time) bool {
 	return date.Before(nowDate)
 }
 
-// addTaskHandler обрабатывает POST /api/task — создание новой задачи
+// addTaskHandler обрабатывает POST  — создание новой задачи
 func addTaskHandler(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	var task db.Task
 	
@@ -83,7 +83,7 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	writeJson(w, http.StatusCreated, map[string]string{"id": fmt.Sprintf("%d", id)})
 }
 
-// getTaskHandler обрабатывает GET /api/task?id=... — получение задачи по ID
+// getTaskHandler обрабатывает GET  — получение задачи по ID
 func getTaskHandler(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
@@ -100,7 +100,7 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	writeJson(w, http.StatusOK, task)
 }
 
-// updateTaskHandler обрабатывает PUT /api/task — обновление задачи
+// updateTaskHandler обрабатывает PUT  — обновление задачи
 func updateTaskHandler(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	var task db.Task
 	
@@ -154,7 +154,7 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request, store *db.Store) 
 	writeJson(w, http.StatusOK, map[string]string{})
 }
 
-// doneTaskHandler обрабатывает POST /api/task/done — завершение задачи
+// doneTaskHandler обрабатывает POST  — завершение задачи
 func doneTaskHandler(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	if r.Method != http.MethodPost {
 		writeJson(w, http.StatusMethodNotAllowed, map[string]string{"error": "Метод не поддерживается"})
@@ -197,7 +197,7 @@ func doneTaskHandler(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	writeJson(w, http.StatusOK, map[string]string{})
 }
 
-// deleteTaskHandler обрабатывает DELETE /api/task?id=... — удаление задачи
+// deleteTaskHandler обрабатывает DELETE  — удаление задачи
 func deleteTaskHandler(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	if r.Method != http.MethodDelete {
 		writeJson(w, http.StatusMethodNotAllowed, map[string]string{"error": "Метод не поддерживается"})
@@ -218,7 +218,7 @@ func deleteTaskHandler(w http.ResponseWriter, r *http.Request, store *db.Store) 
 	writeJson(w, http.StatusOK, map[string]string{})
 }
 
-// taskHandler маршрутизирует запросы по HTTP-методу для эндпоинта /api/task
+// taskHandler маршрутизирует запросы по HTTP-методу для эндпоинта 
 func taskHandler(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	switch r.Method {
 	case http.MethodPost:
